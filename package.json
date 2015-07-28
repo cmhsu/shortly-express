@@ -8,9 +8,10 @@
   "private": true,
   "scripts": {
     "start": "./node_modules/.bin/nodemon --ignore node_modules shortly.js",
-    "test": "node shortly.js & ./node_modules/.bin/mocha --bail --reporter nyan test/ServerSpec.js; pkill -n node;"
+    "test": "./node_modules/.bin/mocha --bail --reporter nyan test/ServerSpec.js; pkill -n node;"
   },
   "dependencies": {
+    "bcrypt": "^0.8.4",
     "bcrypt-nodejs": "0.0.3",
     "bluebird": "1.0.8",
     "body-parser": "^1.5.2",
