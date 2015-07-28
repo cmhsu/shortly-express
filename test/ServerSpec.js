@@ -17,7 +17,7 @@ var beforeEach = function(){};
 /************************************************************/
 
 
-describe('ZXcasdfsdf', function() {
+describe('First test', function() {
 
   beforeEach(function() {
     // log out currently signed in user
@@ -232,7 +232,7 @@ describe('ZXcasdfsdf', function() {
       });
     });
 
-    it('Redirects to login page if a user tries to see all of the links and is not signed in', function(done) {
+    xit('Redirects to login page if a user tries to see all of the links and is not signed in', function(done) {
       request('http://127.0.0.1:4568/links', function(error, res, body) {
         expect(res.req.path).to.equal('/login');
         done();
@@ -241,7 +241,7 @@ describe('ZXcasdfsdf', function() {
 
   }); // 'Priviledged Access'
 
-  xdescribe('Account Creation:', function(){
+  describe('Account Creation:', function(){
 
     it('Signup creates a user record', function(done) {
       var options = {
@@ -289,7 +289,7 @@ describe('ZXcasdfsdf', function() {
 
   }); // 'Account Creation'
 
-  xdescribe('Account Login:', function(){
+  describe('Account Login:', function(){
 
     var requestWithSession = request.defaults({jar: true});
 

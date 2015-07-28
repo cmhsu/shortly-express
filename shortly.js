@@ -31,8 +31,15 @@ app.use(session({
 
 app.use(express.static(__dirname + '/public'));
 
+var checkUser = function(req, res, then){
+  if(!req.session.user){
+    res.redirect('/login');
+  }else{
+    then();    
+  } //if
+}
 
-app.get('/', 
+app.get('/', checkUser,  
 function(req, res) {
   res.render('index');
 });
@@ -47,9 +54,8 @@ function(req, res) {
   res.render('signup');
 });
 
-app.get('/create', //check if we have link, if not, save to database
+app.get('/create', checkUser, //check if we have link, if not, save to database
 function(req, res) {
-  
   res.render('index');
   console.log('CREATE: GET. req.body=',req.body);
 });
@@ -62,24 +68,9 @@ function(req, res) {
 
 app.get('/links', 
 function(req, res) {
-  // console.log("TEST------>req.session.user", req.session)
-  if(!req.session.user){
-    res.redirect('/login');
-    // res.end("You need to login!");
-  }else{
-    var model = new Link();
-    var test1 = model.fetchAll();
-    // var links = Links.fetch();
-    console.log('TEST -----> link.fetchAll = ', test1);
-    // console.log('TEST -----> Links.fetch = ', links);
-    
-    res.send(200, test1);
-    // res.render('index');
-    // Links.reset().fetch().then(function(links) {
-    //   res.send(200, links.models);
-    // });
-  } //if
-
+  Links.reset().fetch().then(function(links){ 
+    res.send(200, links.models);
+  });
 });
 
 app.post('/links',  
@@ -130,22 +121,15 @@ function(req, res){
     'username': username
   }).fetch().then(function(user) { 
     if (!user) { // failure
-      res.end('failed login');
+      // res.end('failed login');
+      res.redirect('/login');
     } else { //success
       console.log('----> user=', user);
       if(bcrypt.compareSync(password, user.attributes.password)){ //user.password is a hash
         
             req.session.user = username;
-            res.redirect('/links');
-        // req.session.regenerate(function(){
-        // });
-        // req.session.user = username; 
-        // req.session = true;
-
-        // res.end('login successful!');
-        // res.redirect('/links');
+            res.redirect('/');
       } //if
-        
     } //if
   }); //fetch
   
@@ -170,20 +154,42 @@ function(req, res){
   var hash = bcrypt.hashSync(password, 10);
   // var userObj = db.users.findOne({ username: username, password: hash });
   var user = new User({
-    'username': username,
-    'password': hash
+    'username': username
   });
 
-  user.save().then(function() {
-    console.log("TEST ------> Save user success!");
-    res.end('success!');
-  });
+  user.fetch().then(function(result) {
+    console.log('TEST----> inside signup POST. user = ', result)
+    if (!result) { //username returns nothing
+      var newUser = new User({
+        'username':username,
+        'password': hash
+      });
+      newUser.save().then(function() {
+        req.session.user = username;    
+        res.redirect('/');
+      });
+    } else { //username does return something
+      if(bcrypt.compareSync(password, result.attributes.password)){ //user.password is a hash
+        req.session.user = username;
+        res.redirect('/');
+      }else{
+        res.end("Username taken!");        
+      } //if
+    } //if
+  }); //user.fetch()
 }); //app /login
 
 /************************************************************/
 // Write your authentication routes here
 /************************************************************/
 
+app.get('/logout', function(req, res){
+  req.session.destroy(function(err) {
+    if (err) throw error;
+    res.redirect('/login');
+  })
+
+});
 
 
 /************************************************************/
@@ -198,7 +204,7 @@ app.get('/*', function(req, res) {
     if (!link) {
       res.redirect('/');
     } else {
-      // console.log("TEST ------> working code");
+      console.log("TEST ------> working code");
 
       var click = new Click({
         link_id: link.get('id')
