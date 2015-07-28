@@ -13,8 +13,20 @@ var Click = require('./app/models/click');
 var bcrypt = require('bcrypt');
 var session = require('express-session')
 
+var passport = require('passport');
+
 var app = express();
 
+// passport.use(new LocalStrategy(
+//   // function(username, password, done) {
+//   //   User.findOne({ username: username }, function (err, user) {
+//   //     if (err) { return done(err); }
+//   //     if (!user) { return done(null, false); }
+//   //     if (!user.verifyPassword(password)) { return done(null, false); }
+//   //     return done(null, user);
+//   //   });
+//   // } //function
+// )); //passport.use
 
 app.set('views', __dirname + '/views');
 app.set('view engine', 'ejs');
@@ -26,12 +38,13 @@ app.use(session({
   secret: 'keyboard cat',
   resave: false,
   saveUninitialized: true,
-  cookie: { maxAge: 6000 }
+  cookie: { maxAge: 600000 }
 })); //app.use()
 
 app.use(express.static(__dirname + '/public'));
 
 var checkUser = function(req, res, then){
+  console.log("INSIDE CHECKUSER --------> session.user=", req.session.user);
   if(!req.session.user){
     res.redirect('/login');
   }else{
@@ -68,12 +81,25 @@ function(req, res) {
 
 app.get('/links', 
 function(req, res) {
-  Links.reset().fetch().then(function(links){ 
-    res.send(200, links.models);
-  });
-});
+  var username = req.session.user; 
 
-app.post('/links',  
+  new User({'username':username}).fetch().then(function(user){
+
+    // user.attributes.id
+    Links.reset().query({
+      where:{
+        'user_id': user.attributes.id
+      }
+    }).fetch().then(function(links){ 
+        res.send(200, links.models);
+      });
+    });
+    
+
+  }); // new User.fetch() 
+
+
+app.post('/links', 
 function(req, res) {
   console.log('TEST-----> Inside Links.post');
   var uri = req.body.url;
@@ -83,31 +109,42 @@ function(req, res) {
     return res.send(404);
   }
 
-  new Link({ url: uri }).fetch().then(function(found) {
-    if (found) {
-      // console.log('test ----------------------- found =', found);
-      // console.log('test =--------------------', found.attributes);
-      res.send(200, found.attributes);
-    } else {
-      util.getUrlTitle(uri, function(err, title) {
-        if (err) {
-          console.log('Error reading URL heading: ', err);
-          return res.send(404);
-        }
+  var username = req.session.user; 
+  
+  new User({'username':username}).fetch().then(function(user){
+    new Link({ url: uri, 'user_id':user.attributes.id}).fetch().then(function(found) {
+      if (found) {
+        res.send(200, found.attributes);
+      } else {
 
-        var link = new Link({
-          url: uri,
-          title: title,
-          base_url: req.headers.origin
-        });
+        util.getUrlTitle(uri, function(err, title) {
+          if (err) {
+            console.log('Error reading URL heading: ', err);
+            return res.send(404);
+          }
 
-        link.save().then(function(newLink) {
-          Links.add(newLink);
-          res.send(200, newLink);
-        });
-      });
-    }
-  });
+          
+          var link = new Link({
+            url: uri,
+            title: title,
+            base_url: req.headers.origin,
+            user_id: user.attributes.id
+          }); //link
+
+          link.save().then(function(newLink) {
+            Links.add(newLink);
+            res.send(200, newLink);
+          }); //link.save()
+   
+          // checkUser(req, res, function(){
+          // }); //checkUser()
+
+
+        }); //util.getUrlTitle
+      } //if
+    }); //newLink
+
+  }); // new User.fetch()
 });
 
 app.post('/login', 
@@ -124,11 +161,11 @@ function(req, res){
       // res.end('failed login');
       res.redirect('/login');
     } else { //success
-      console.log('----> user=', user);
       if(bcrypt.compareSync(password, user.attributes.password)){ //user.password is a hash
-        
+          req.session.regenerate(function(err){
             req.session.user = username;
             res.redirect('/');
+          }); //req.session
       } //if
     } //if
   }); //fetch
