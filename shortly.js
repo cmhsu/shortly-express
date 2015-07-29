@@ -2,8 +2,6 @@ var express = require('express');
 var util = require('./lib/utility');
 var partials = require('express-partials');
 var bodyParser = require('body-parser');
-
-
 var db = require('./app/config');
 var Users = require('./app/collections/users');
 var User = require('./app/models/user');
@@ -13,26 +11,57 @@ var Click = require('./app/models/click');
 var bcrypt = require('bcrypt');
 var session = require('express-session')
 
-var passport = require('passport');
 
 var app = express();
 
-// passport.use(new LocalStrategy(
-//   // function(username, password, done) {
-//   //   User.findOne({ username: username }, function (err, user) {
-//   //     if (err) { return done(err); }
-//   //     if (!user) { return done(null, false); }
-//   //     if (!user.verifyPassword(password)) { return done(null, false); }
-//   //     return done(null, user);
-//   //   });
-//   // } //function
-// )); //passport.use
+//************************Passport*************************//
+var passport = require('passport');
+GitHubStrategy = require('passport-github').Strategy;
 
+passport.serializeUser(function(user, done) {
+  done(null, user);
+});
+
+passport.deserializeUser(function(obj, done) {
+  done(null, obj);
+});
+
+passport.use(new GitHubStrategy({
+    clientID: '5842ecaa5427a0bd2c14',
+    clientSecret: "d18b2a192f27843b1ff780a9923d40478bd49b0f",
+    callbackURL: "http://127.0.0.1:4568/auth/github/callback"
+  },
+  function(accessToken, refreshToken, profile, done) {
+    // asynchronous verification, for effect...
+    // console.log("Inside passport, before nextTick(): profile=", profile);
+    
+    console.log("Inside passport: profile=", profile);
+    // console.log("Inside passport: accessToken=", accessToken);
+    // NOTE: here we add code to pull user from out users table based on github information
+      return done(null, profile);
+    // User.findOrCreate({githubId: profile.id}, function(err, profile) {
+
+    // });
+    
+    // process.nextTick(function () {
+      
+    //   // To keep the example simple, the user's GitHub profile is returned to
+    //   // represent the logged-in user.  In a typical application, you would want
+    //   // to associate the GitHub account with a user record in your database,
+    //   // and return that user instead.
+    // });
+  } //function
+)); // passport.use
+
+// NOTE: untouched
+//************************ App ***************//
 app.set('views', __dirname + '/views');
 app.set('view engine', 'ejs');
 app.use(partials()); // Parse JSON (uniform resource locators)
 app.use(bodyParser.json()); // Parse forms (signup/login)
 app.use(bodyParser.urlencoded({ extended: true }));
+app.use(express.static(__dirname + '/public'));
+
 
 app.use(session({
   secret: 'keyboard cat',
@@ -40,16 +69,24 @@ app.use(session({
   saveUninitialized: true,
   cookie: { maxAge: 600000 }
 })); //app.use()
+//************************ App ***************//
 
-app.use(express.static(__dirname + '/public'));
+app.use(passport.initialize());
+app.use(passport.session());
+
+
+//************************ Passport *************************//
+
+
 
 var checkUser = function(req, res, then){
-  console.log("INSIDE CHECKUSER --------> session.user=", req.session.user);
-  if(!req.session.user){
-    res.redirect('/login');
-  }else{
-    then();    
-  } //if
+  // console.log("INSIDE CHECKUSER --------> session.user=", req.session.user);
+  // if(!req.session.user){
+  //   res.redirect('/login');
+  // }else{
+  //   then();    
+  // } //if
+  then();
 }
 
 app.get('/', checkUser,  
@@ -81,7 +118,8 @@ function(req, res) {
 
 app.get('/links', 
 function(req, res) {
-  var username = req.session.user; 
+  // var username = req.session.user; 
+  var username = 'payton'; //testing
 
   new User({'username':username}).fetch().then(function(user){
 
@@ -110,9 +148,11 @@ function(req, res) {
   }
 
   var username = req.session.user; 
-  
+
   new User({'username':username}).fetch().then(function(user){
-    new Link({ url: uri, 'user_id':user.attributes.id}).fetch().then(function(found) {
+    var user_id = user.attributes.id;
+
+    new Link({ url: uri, 'user_id':user_id}).fetch().then(function(found) {
       if (found) {
         res.send(200, found.attributes);
       } else {
@@ -128,7 +168,7 @@ function(req, res) {
             url: uri,
             title: title,
             base_url: req.headers.origin,
-            user_id: user.attributes.id
+            user_id: user_id
           }); //link
 
           link.save().then(function(newLink) {
@@ -228,6 +268,20 @@ app.get('/logout', function(req, res){
 
 });
 
+app.get('/auth/github/callback', 
+  passport.authenticate('github', { failureRedirect: '/login' }),
+  function(req, res) {
+    console.log("/auth/github/callback ------>");
+    res.redirect('/');
+});
+
+app.get('/auth/github',
+  passport.authenticate('github'),
+  function(req, res){
+    console.log("/auth/github ------>");
+    // The request will be redirected to GitHub for authentication, so this
+    // function will not be called.
+  });
 
 /************************************************************/
 // Handle the wildcard route last - if all other routes fail
@@ -261,4 +315,5 @@ app.get('/*', function(req, res) {
 });
 
 console.log('Shortly is listening on 4568');
+
 app.listen(4568);
