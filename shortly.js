@@ -78,7 +78,6 @@ app.use(passport.session());
 //************************ Passport *************************//
 
 
-
 var checkUser = function(req, res, then){
   // console.log("INSIDE CHECKUSER --------> session.user=", req.session.user);
   // if(!req.session.user){
